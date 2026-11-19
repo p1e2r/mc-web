@@ -17,14 +17,22 @@ globalThis.mcwebClinitError = (cls, e) => {
   try { const j = e && e.$javaException !== undefined ? e : null; msg = String(e && e.message ? e.message : e); } catch (_) {}
   console.error("[mc-web] static initializer of " + cls + " failed: " + msg + "\n" + (e && e.stack ? e.stack.split("\n").slice(0, 40).join("\n") : ""));
 };
+// Freeze/deadlock diagnostics. Capturing a JS stack on every green-thread suspend and every class init is very
+// expensive (it was ~17% of the main thread in-game), so it is opt-in: localStorage["mcweb.debug"] = "1", reload.
+let mcwebDebug = false;
+try { mcwebDebug = !!(globalThis.localStorage && localStorage.getItem("mcweb.debug") === "1"); } catch (e) {}
 globalThis.mcwebClinitStarts = new Map();
-globalThis.mcwebClinitStart = (cls) => { mcwebClinitStarts.set(cls, new Error().stack); };
 globalThis.mcwebSuspends = [];
 globalThis.mcwebLastSuspend = new Map(); let mcwebSuspendSeq = 0;
-globalThis.mcwebOnSuspend = (thr) => {
-  if (mcwebSuspends.length < 30) mcwebSuspends.push(new Error().stack);
-  mcwebLastSuspend.set(thr, { seq: ++mcwebSuspendSeq, at: performance.now(), stack: new Error().stack });
-};
+if (mcwebDebug) {
+  globalThis.mcwebClinitStart = (cls) => { mcwebClinitStarts.set(cls, new Error().stack); };
+  globalThis.mcwebOnSuspend = (thr) => {
+    if (mcwebSuspends.length < 30) mcwebSuspends.push(new Error().stack);
+    mcwebLastSuspend.set(thr, { seq: ++mcwebSuspendSeq, at: performance.now(), stack: new Error().stack });
+  };
+} else {
+  globalThis.mcwebClinitStart = () => {};
+}
 globalThis.mcwebDumpSuspends = () => [...mcwebLastSuspend.values()].sort((a, b) => b.seq - a.seq).map(v =>
   '#' + v.seq + ' @' + (v.at / 1000).toFixed(1) + 's\n' + v.stack.split('\n').slice(2, 40).map(l => l.replace(/\(http[^)]*\/classes\.js/, '(').trim()).join('\n')).join('\n----\n');
 

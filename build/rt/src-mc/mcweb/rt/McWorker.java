@@ -187,6 +187,9 @@ public final class McWorker {
             if (ev > 0) {
                 PortChannel ch = new PortChannel(ev);
                 mcweb.rt.game.GameBridge.acceptChannel(server, ch, user);
+                // both ends live in the same browser tab: a busy page (slow device, chunk loading) must not get the
+                // player kicked with "Timed out", so drop Netty's 30 s read timeout (keep-alives are cut in rules.txt)
+                if (ch.pipeline().get("timeout") != null) ch.pipeline().remove("timeout");
                 ch.startReading();
             }
         }

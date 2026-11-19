@@ -46,6 +46,7 @@ const S = {
   drawFb: 0,
   readFb: 0,
   textureBuffers: new Map(), // texture id -> {buffer, ifmt}
+  shadows: new Map(),        // buffer id -> {u8, ver, lo, hi}: CPU copy of buffers sampled as texture buffers
 };
 const ATTR0 = () => [];
 function attribsOf(vao) {
@@ -269,6 +270,7 @@ GLI.glDeleteBuffers = (n, ids) => {
     const b = T.buffers.del(id);
     if (b) { if (b.data) gl.deleteBuffer(b.data); if (b.index) gl.deleteBuffer(b.index); }
     S.bufInfo.delete(id);
+    S.shadows.delete(id);
     for (const k of Object.keys(S.boundBuf)) if (S.boundBuf[k] === id) S.boundBuf[k] = 0;
   }
 };
@@ -316,6 +318,49 @@ function glBufFor(id, target) {
   }
   return o[slot];
 }
+// stats, readable from the console: LWJGLWeb.glStats
+const GS = LW.glStats = { readbacks: 0, readbackBytes: 0, writeThrough: 0 };
+// upload `u8` at `offset` into one specific twin of a buffer (slot "data" or "index"), keeping GL bindings intact
+function writeSlot(o, slot, offset, u8) {
+  const webglBuf = o[slot];
+  if (!webglBuf) return;
+  const t = slot === "index" ? gl.ELEMENT_ARRAY_BUFFER : gl.COPY_WRITE_BUFFER;
+  const prev = slot === "index" ? currentEbo() : gl.getParameter(gl.COPY_WRITE_BUFFER_BINDING);
+  if (prev !== webglBuf) gl.bindBuffer(t, webglBuf);
+  gl.bufferSubData(t, offset, u8);
+  if (prev !== webglBuf) gl.bindBuffer(t, prev);
+}
+// after the twin for `target` received `u8` at `offset`, give the other twin the same bytes: a cheap upload instead
+// of marking it stale and later reading the whole buffer back from the GPU (a pipeline stall)
+function writeThrough(id, target, offset, u8) {
+  const o = T.buffers.get(id);
+  if (!o) return;
+  const other = target === E.ELEMENT_ARRAY_BUFFER ? "data" : "index";
+  if (!o[other]) return;
+  if (o.stale && o.stale[other]) { markWritten(id, target); return; }   // already out of date: stays lazy
+  writeSlot(o, other, offset, u8);
+  GS.writeThrough++;
+}
+// CPU shadow of a buffer used as a texture buffer, so the emulation never has to read it back from the GPU.
+function shadowOf(id) { return S.shadows.get(id); }
+function shadowDirty(sh, lo, hi) { sh.ver++; sh.lo = Math.min(sh.lo, lo); sh.hi = Math.max(sh.hi, hi); }
+function shadowWrite(id, offset, u8) {
+  const sh = S.shadows.get(id);
+  if (!sh) return;
+  if (offset + u8.byteLength > sh.u8.byteLength) { const n = new Uint8Array(offset + u8.byteLength); n.set(sh.u8); sh.u8 = n; }
+  sh.u8.set(u8, offset);
+  shadowDirty(sh, offset, offset + u8.byteLength);
+}
+function ensureShadow(id) {
+  let sh = S.shadows.get(id);
+  if (sh) return sh;
+  const info = bufInfo(id);
+  sh = { u8: new Uint8Array(info.size), ver: 1, lo: 0, hi: info.size };
+  const o = T.buffers.get(id);
+  if (o && (o.data || o.index) && info.size) readBufferData(o.data || o.index, !o.data, 0, sh.u8);   // once
+  S.shadows.set(id, sh);
+  return sh;
+}
 function markWritten(id, target) {
   const o = T.buffers.get(id);
   if (!o) return;
@@ -325,6 +370,7 @@ function markWritten(id, target) {
 }
 function currentEbo() { return gl.getParameter(gl.ELEMENT_ARRAY_BUFFER_BINDING); }
 function readBufferData(webglBuf, isIndex, offset, dst) {
+  GS.readbacks++; GS.readbackBytes += dst.byteLength;
   const t = isIndex ? gl.ELEMENT_ARRAY_BUFFER : gl.COPY_READ_BUFFER;
   const prev = isIndex ? currentEbo() : gl.getParameter(gl.COPY_READ_BUFFER_BINDING);
   gl.bindBuffer(t, webglBuf);
@@ -358,8 +404,11 @@ GLI.glBufferData = (target, size, data, usage) => {
   const info = bufInfo(id);
   info.size = size;
   info.usage = usage;
-  if (data) gl.bufferData(t, bytes(data, size), usage);
+  const u8 = data ? bytes(data, size) : null;
+  if (u8) gl.bufferData(t, u8, usage);
   else gl.bufferData(t, size, usage);
+  const sh = shadowOf(id);
+  if (sh) { sh.u8 = new Uint8Array(size); if (u8) sh.u8.set(u8.subarray(0, size)); sh.ver++; sh.lo = 0; sh.hi = size; }
   // Any twin must be resized too.
   const o = T.buffers.get(id);
   if (o) {
@@ -368,10 +417,10 @@ GLI.glBufferData = (target, size, data, usage) => {
       const ot = otherSlot === "index" ? gl.ELEMENT_ARRAY_BUFFER : gl.COPY_WRITE_BUFFER;
       const prev = otherSlot === "index" ? currentEbo() : gl.getParameter(gl.COPY_WRITE_BUFFER_BINDING);
       gl.bindBuffer(ot, o[otherSlot]);
-      gl.bufferData(ot, size, usage);
+      if (u8) gl.bufferData(ot, u8, usage); else gl.bufferData(ot, size, usage);
       gl.bindBuffer(ot, prev);
       o.stale = o.stale || {};
-      o.stale[otherSlot] = !!data;
+      o.stale[otherSlot] = false;
     }
   }
 };
@@ -379,8 +428,10 @@ GLI.glBufferStorage = (target, size, data, flags) => GLI.glBufferData(target, si
 GLI.glBufferSubData = (target, offset, size, data) => {
   if (typeof size !== "number") { data = size; size = data.byteLength; }
   const id = boundId(target);
-  gl.bufferSubData(bufTarget(target), offset, bytes(data, size));
-  markWritten(id, target);
+  const u8 = bytes(data, size);
+  gl.bufferSubData(bufTarget(target), offset, u8);
+  writeThrough(id, target, offset, u8);
+  shadowWrite(id, offset, u8);
 };
 GLI.glGetBufferSubData = (target, offset, size, data) => {
   if (typeof size !== "number") { data = size; size = data.byteLength; }
@@ -395,7 +446,21 @@ GLI.glCopyBufferSubData = (rt, wt, ro, wo, size) => {
   gl.bindBuffer(gl.COPY_READ_BUFFER, rb);
   gl.bindBuffer(gl.COPY_WRITE_BUFFER, wb);
   gl.copyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, ro, wo, size);
-  markWritten(w, E.COPY_WRITE);
+  // the destination's element-array twin gets the same GPU->GPU copy from the source's element-array twin
+  // (created once and then kept current by write-through), instead of a full read-back on its next use
+  const wo2 = T.buffers.get(w);
+  if (wo2 && wo2.index && !(wo2.stale && wo2.stale.index)) {
+    const srcIdx = glBufFor(r, E.ELEMENT_ARRAY_BUFFER);
+    gl.bindBuffer(gl.COPY_READ_BUFFER, srcIdx);
+    gl.bindBuffer(gl.COPY_WRITE_BUFFER, wo2.index);
+    gl.copyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, ro, wo, size);
+    GS.copyThrough = (GS.copyThrough || 0) + 1;
+  } else markWritten(w, E.COPY_WRITE);
+  const dsh = shadowOf(w);
+  if (dsh) {
+    const ssh = ensureShadow(r);   // the source (usually a staging buffer) gets its own CPU copy once
+    shadowWrite(w, wo, ssh.u8.slice(ro, ro + size));
+  }
   // restore the real bindings for those targets
   gl.bindBuffer(gl.COPY_READ_BUFFER, glBufFor(boundId(E.COPY_READ), E.COPY_READ));
   gl.bindBuffer(gl.COPY_WRITE_BUFFER, glBufFor(boundId(E.COPY_WRITE), E.COPY_WRITE));
@@ -427,9 +492,11 @@ function uploadMapped(id, m, off, len) {
   const t = m.target === E.ELEMENT_ARRAY_BUFFER ? gl.ELEMENT_ARRAY_BUFFER : gl.COPY_WRITE_BUFFER;
   const prev = t === gl.ELEMENT_ARRAY_BUFFER ? currentEbo() : gl.getParameter(gl.COPY_WRITE_BUFFER_BINDING);
   gl.bindBuffer(t, glBufFor(id, m.target));
-  gl.bufferSubData(t, m.offset + off, LW.copyBytes(m.ptr + off, len));
+  const u8 = LW.viewBytes(m.ptr + off, len);   // zero-copy view: bufferSubData copies it right away
+  gl.bufferSubData(t, m.offset + off, u8);
   gl.bindBuffer(t, prev);
-  markWritten(id, m.target);
+  writeThrough(id, m.target, m.offset + off, u8);
+  shadowWrite(id, m.offset + off, u8);
 }
 GLI.glMapBufferRange = (target, offset, length, access) => mapRange(boundId(target), target, offset, length, access);
 GLI.glMapBuffer = (target, access) => {
@@ -852,29 +919,41 @@ function syncTextureBuffers() {
     if (!id) continue;
     const tb = S.textureBuffers.get(id);
     if (!tb || !tb.buffer) continue;
-    const info = bufInfo(tb.buffer);
     const f = TBFMT[tb.ifmt];
     if (!f) { LW.warnOnce("tbfmt" + tb.ifmt, "unsupported texture buffer format 0x" + tb.ifmt.toString(16)); continue; }
+    const sh = ensureShadow(tb.buffer);
     const [fmt, type, comps, size] = f;
-    const texel = comps * size;
-    const count = Math.floor(info.size / texel);
+    const texel = comps * size, rowBytes = TB_WIDTH * texel;
+    const count = Math.floor(sh.u8.byteLength / texel);
     const h = Math.max(1, Math.ceil(count / TB_WIDTH));
-    const raw = new Uint8Array(TB_WIDTH * h * texel);
-    const o = T.buffers.get(tb.buffer);
-    if (o && (o.data || o.index)) readBufferData(o.data || o.index, !o.data, 0, raw.subarray(0, count * texel));
-    // integer formats narrower than 32 bits are widened (R8I/R16I -> R32I)
-    let ifmtWebGL = tb.ifmt, data = typedFor(type, raw), t = type;
-    if ((type === E.BYTE || type === E.SHORT || type === E.UNSIGNED_SHORT) && fmt === 0x8d94) {
-      const src = type === E.BYTE ? new Int8Array(raw.buffer) : type === E.SHORT ? new Int16Array(raw.buffer) : new Uint16Array(raw.buffer);
-      data = new Int32Array(src.length);
-      data.set(src);
-      ifmtWebGL = 0x8235;
-      t = E.INT;
-    }
     gl.activeTexture(gl.TEXTURE0 + u);
     gl.bindTexture(gl.TEXTURE_2D, tb.tex);
     tbUnits.push(u);
-    withUnpackDefaults(() => gl.texImage2D(gl.TEXTURE_2D, 0, ifmtWebGL, TB_WIDTH, h, 0, fmt, t, data));
+    if (tb.ver === sh.ver && tb.h === h && tb.fmtUp === tb.ifmt && !tb.dirty) continue;   // unchanged: just bind
+    // full upload when the size/format changed or another texture buffer consumed the dirty range; else dirty rows
+    const full = tb.h !== h || tb.fmtUp !== tb.ifmt || tb.dirty || tb.ver !== sh.baseVer;
+    const r0 = full ? 0 : Math.floor(sh.lo / rowBytes), r1 = full ? h : Math.min(h, Math.ceil(sh.hi / rowBytes));
+    if (r1 > r0) {
+      const raw = new Uint8Array((r1 - r0) * rowBytes);
+      const srcEnd = Math.min(sh.u8.byteLength, r1 * rowBytes) - r0 * rowBytes;
+      if (srcEnd > 0) raw.set(sh.u8.subarray(r0 * rowBytes, r0 * rowBytes + srcEnd));
+      // integer formats narrower than 32 bits are widened (R8I/R16I -> R32I)
+      let ifmtWebGL = tb.ifmt, data = typedFor(type, raw), t = type;
+      if ((type === E.BYTE || type === E.SHORT || type === E.UNSIGNED_SHORT) && fmt === 0x8d94) {
+        const src = type === E.BYTE ? new Int8Array(raw.buffer) : type === E.SHORT ? new Int16Array(raw.buffer) : new Uint16Array(raw.buffer);
+        data = new Int32Array(src.length);
+        data.set(src);
+        ifmtWebGL = 0x8235;
+        t = E.INT;
+      }
+      withUnpackDefaults(() => {
+        if (full) gl.texImage2D(gl.TEXTURE_2D, 0, ifmtWebGL, TB_WIDTH, h, 0, fmt, t, data);
+        else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, r0, TB_WIDTH, r1 - r0, fmt, t, data);
+      });
+      GS.tbUploads = (GS.tbUploads || 0) + 1; GS.tbRows = (GS.tbRows || 0) + (r1 - r0);
+    }
+    tb.ver = sh.ver; tb.h = h; tb.fmtUp = tb.ifmt; tb.dirty = false;
+    sh.baseVer = sh.ver; sh.lo = Infinity; sh.hi = -Infinity;
   }
   gl.activeTexture(gl.TEXTURE0 + S.activeUnit);
 }

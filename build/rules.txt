@@ -252,6 +252,8 @@ body net/minecraft/server/rcon/thread/RconThread.create -> default
 class net/minecraft/util/monitoring/jmx/MinecraftServerStatistics -> mcweb/rt/stub/JmxStub
 body net/minecraft/server/dedicated/Settings.store -> default
 body net/minecraft/server/dedicated/ServerWatchdog.exit -> default
+# singleplayer world in a Web Worker: no keep-alive kicks (client and server share one tab)
+body net/minecraft/server/network/ServerCommonPacketListenerImpl.keepConnectionAlive -> default
 body net/minecraft/server/dedicated/ServerWatchdog$1.run -> default
 body net/minecraft/server/Main.writePidFile -> default
 body joptsimple/internal/Columns.piecesOfEmbeddedLine -> default

@@ -5,9 +5,12 @@ DATA=/data
 APP=/opt/mcweb
 WANT="$(cat "$APP/BUILD_ID" 2>/dev/null || echo dev)-${MC_VERSION:-26.2}-${TEAVM_OPT:-SIMPLE}"
 export MCWEB_BUILD_ID="$WANT"
-mkdir -p "$DATA/assets/tmp" "$DATA/mc"
+# nginx's proxy_store only creates the last directory level, so the cache tree must exist up front
+mkdir -p "$DATA/assets/tmp" "$DATA/assets/mc/assets/objects" "$DATA/mc"
 touch "$DATA/build.log"
 chown -R www-data:www-data "$DATA/assets"   # nginx workers store downloaded sounds there
+# stop promptly on `docker stop` (bash as PID 1 ignores SIGTERM unless it is trapped)
+trap 'echo "[mc-web] stopping"; nginx -s quit 2>/dev/null; kill $(jobs -p) 2>/dev/null; exit 0' TERM INT
 
 # 1) multiplayer relay (only with Cloudflare Access configured, or explicitly without auth)
 if [ -n "${CF_TEAM_DOMAIN:-}" ] && [ -n "${CF_ACCESS_AUD:-}" ] || [ "${INSECURE_NO_AUTH:-}" = "1" ]; then
@@ -51,6 +54,6 @@ else
 fi
 
 # keep the container running as long as nginx does
-while kill -0 "$(cat /run/nginx.pid 2>/dev/null)" 2>/dev/null; do sleep 5; done
+while kill -0 "$(cat /run/nginx.pid 2>/dev/null)" 2>/dev/null; do sleep 5 & wait $!; done
 echo "[mc-web] nginx stopped"
 exit 1
