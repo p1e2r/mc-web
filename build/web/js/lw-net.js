@@ -6,8 +6,12 @@ let nextId = 1;
 
 // The relay normally sits behind the page server on the same origin (nginx in the Docker image proxies /relay).
 // The local-play server (serve.py) has no proxy, so when /relay/health isn't answered here we fall back to :8091.
+// Only plain-http pages can use that fallback: browsers refuse ws:// from an https:// page, so behind HTTPS (Cloudflare)
+// the relay is always same-origin wss://.
 let relayBase = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/relay";
-fetch("relay/health").then((r) => { if (!r.ok) throw 0; }).catch(() => { relayBase = "ws://" + location.hostname + ":8091/relay"; });
+if (location.protocol === "http:") {
+  fetch("relay/health").then((r) => { if (!r.ok) throw 0; }).catch(() => { relayBase = "ws://" + location.hostname + ":8091/relay"; });
+}
 function relayUrl(target) {
   const base = LW.config.relayUrl || relayBase;
   return base + "?target=" + encodeURIComponent(target);
