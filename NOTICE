@@ -13,6 +13,7 @@ Third-party software included:
   (sources in build/classlib-fix/). Bundled TeaVM dependencies: hppc, Rhino, joda-time, jzlib (see their licenses).
 - ASM 9.10.1 (tvm/lib/asm-*.jar), BSD 3-Clause License, https://asm.ow2.io
 - fflate (build/web/js/fflate.min.js), MIT License, https://github.com/101arrowz/fflate
-- JvmDowngrader (downloaded into the image at build time), https://github.com/unimined/JvmDowngrader
+- JvmDowngrader 2.0.1 exception classes (docker/jvmdg-exc.jar, unmodified), LGPL-2.1,
+  https://github.com/unimined/JvmDowngrader (source: Maven Central xyz.wagyourtail.jvmdowngrader)
 - jose and ws (relay, installed from npm), MIT License
 - nginx, Node.js, Python and Eclipse Temurin (OpenJDK) from the image's base and package manager
