@@ -165,11 +165,26 @@ public final class Shim {
     public static Spliterator.OfDouble spliteratorsDoubleArray(double[] a, int from, int to, int ch) { return Arrays.stream(a, from, to).spliterator(); }
     public static <K> mcweb.rt.KeySetView<K> chmNewKeySet() { return new mcweb.rt.KeySetView<>(); }
     public static long timeUnitConvertDuration(java.util.concurrent.TimeUnit u, java.time.Duration d) { return u.convert(d.toNanos(), java.util.concurrent.TimeUnit.NANOSECONDS); }
+    // Minecraft's packet decompression (CompressionDecoder) hands the whole compressed packet to setInput(ByteBuffer)
+    // and asks for the whole result in one inflate(ByteBuffer). TeaVM's Inflater is zlib compiled from Java; fflate
+    // (JavaScript) is much faster, so the pair is done in one fflate call. The Inflater still gets the input, so any
+    // other caller pattern (or corrupt data) falls back to it.
+    private static final java.util.Map<java.util.zip.Inflater, byte[]> INFLATE_INPUT = new java.util.IdentityHashMap<>();
     public static int inflaterInflateBB(java.util.zip.Inflater inf, java.nio.ByteBuffer out) throws java.util.zip.DataFormatException {
+        byte[] src = INFLATE_INPUT.remove(inf);
+        if (src != null) {
+            try {
+                byte[] r = mcweb.rt.zip.JsZ.decompress(mcweb.rt.zip.JsZ.ZLIB, src, src.length);
+                if (r.length <= out.remaining()) { out.put(r); return r.length; }
+            } catch (java.io.IOException e) {
+                // fall through to the Inflater, which reports the error the way the game expects
+            }
+        }
         byte[] tmp = new byte[out.remaining()]; int n = inf.inflate(tmp); out.put(tmp, 0, n); return n;
     }
     public static void inflaterSetInputBB(java.util.zip.Inflater inf, java.nio.ByteBuffer in) {
         byte[] tmp = new byte[in.remaining()]; in.get(tmp); inf.setInput(tmp);
+        INFLATE_INPUT.put(inf, tmp);
     }
     public static java.lang.invoke.MethodType methodType(Class<?> r) { throw new UnsupportedOperationException("MethodType"); }
     public static java.lang.invoke.MethodType methodType(Class<?> r, Class<?> p) { throw new UnsupportedOperationException("MethodType"); }

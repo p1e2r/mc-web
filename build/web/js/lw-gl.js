@@ -551,7 +551,7 @@ function recordAttrib(i, size, type, norm, stride, offset, integer) {
   const packed = type === E.UNSIGNED_INT_2_10_10_10_REV || type === 0x8d9f;
   a[i] = Object.assign(prev, {
     buffer: S.boundBuf[E.ARRAY_BUFFER] || 0, size, type, norm: !!norm, offset, integer,
-    stride: stride || (packed ? 4 : size * typeSize(type)), rawStride: stride,
+    stride: stride || (packed ? 4 : size * typeSize(type)), rawStride: stride, applied: 0,
   });
 }
 GLI.glVertexAttribPointer = (i, size, type, norm, stride, offset) => {
@@ -573,35 +573,34 @@ GLI.glVertexAttribI4ui = (i, x, y, z, w) => gl.vertexAttribI4ui(i, x, y, z, w);
 GLI.glVertexAttrib4fv = (i, v) => gl.vertexAttrib4fv(i, f32view(v, 4));
 
 // ---------------------------------------------------------------- drawing
-function withBaseVertex(base, fn) {
-  if (!base) return fn();
-  // Shift every per-vertex attribute by base * stride, draw, then restore.
-  const a = attribsOf(S.vao);
-  const prevArray = gl.getParameter(gl.ARRAY_BUFFER_BINDING);
-  const changed = [];
+// WebGL2 has no base-vertex draws, so a base vertex is applied by pointing the VAO's per-vertex attributes `base`
+// vertices further into their buffers. Which base is currently applied is remembered per attribute, so a run of draws
+// only re-points attributes when the base changes and nothing is "restored" after each draw: a draw without a base
+// vertex simply applies base 0 when the VAO is still shifted. (This used to re-point every attribute twice and
+// query a binding with getParameter on every chunk-section draw.)
+function applyBase(a, base) {
+  if (!base && !a.shifted) return;
+  let bound = -1;
   for (let i = 0; i < a.length; i++) {
     const at = a[i];
-    if (!at || !at.enabled || at.divisor || !at.buffer) continue;
-    gl.bindBuffer(gl.ARRAY_BUFFER, glBufFor(at.buffer, E.ARRAY_BUFFER));
-    const off = at.offset + base * at.stride;
-    if (at.integer) gl.vertexAttribIPointer(i, at.size, at.type, at.stride, off);
-    else gl.vertexAttribPointer(i, at.size, at.type, at.norm, at.stride, off);
-    changed.push(i);
+    if (!at || !at.enabled || at.divisor || !at.buffer || (at.applied || 0) === base) continue;
+    if (bound !== at.buffer) { gl.bindBuffer(gl.ARRAY_BUFFER, glBufFor(at.buffer, E.ARRAY_BUFFER)); bound = at.buffer; }
+    const off = at.offset + base * at.stride, stride = base ? at.stride : at.rawStride;
+    if (at.integer) gl.vertexAttribIPointer(i, at.size, at.type, stride, off);
+    else gl.vertexAttribPointer(i, at.size, at.type, at.norm, stride, off);
+    at.applied = base;
   }
-  try {
-    fn();
-  } finally {
-    for (const i of changed) {
-      const at = a[i];
-      gl.bindBuffer(gl.ARRAY_BUFFER, glBufFor(at.buffer, E.ARRAY_BUFFER));
-      if (at.integer) gl.vertexAttribIPointer(i, at.size, at.type, at.rawStride, at.offset);
-      else gl.vertexAttribPointer(i, at.size, at.type, at.norm, at.rawStride, at.offset);
-    }
-    gl.bindBuffer(gl.ARRAY_BUFFER, prevArray);
-  }
+  a.shifted = base !== 0;
+  if (bound !== -1) gl.bindBuffer(gl.ARRAY_BUFFER, glBufFor(S.boundBuf[E.ARRAY_BUFFER] || 0, E.ARRAY_BUFFER));
+}
+function withBaseVertex(base, fn) {
+  applyBase(attribsOf(S.vao), base || 0);
+  return fn();
 }
 function prepareDraw() {
   syncTextureBuffers();
+  const a = attribsOf(S.vao);
+  if (a.shifted) applyBase(a, 0);   // the previous draw on this VAO left a base vertex applied
 }
 const QUADS = 0x0007;
 GLI.glDrawArrays = (mode, first, count) => { prepareDraw(); if (mode === QUADS) return LW.warnOnce("quads", "GL_QUADS is not supported"); gl.drawArrays(mode, first, count); };
@@ -612,19 +611,19 @@ GLI.glDrawElements = (mode, count, type, offset) => {
   if (isArr(offset)) return LW.warnOnce("clientidx", "client-side index arrays are not supported");
   gl.drawElements(mode, count, type, offset);
 };
-GLI.glDrawElementsBaseVertex = (mode, count, type, offset, base) => { prepareDraw(); withBaseVertex(base, () => gl.drawElements(mode, count, type, offset)); };
+GLI.glDrawElementsBaseVertex = (mode, count, type, offset, base) => { syncTextureBuffers(); withBaseVertex(base, () => gl.drawElements(mode, count, type, offset)); };
 GLI.glDrawElementsInstanced = (mode, count, type, offset, inst) => { prepareDraw(); gl.drawElementsInstanced(mode, count, type, offset, inst); };
-GLI.glDrawElementsInstancedBaseVertex = (mode, count, type, offset, inst, base) => { prepareDraw(); withBaseVertex(base, () => gl.drawElementsInstanced(mode, count, type, offset, inst)); };
+GLI.glDrawElementsInstancedBaseVertex = (mode, count, type, offset, inst, base) => { syncTextureBuffers(); withBaseVertex(base, () => gl.drawElementsInstanced(mode, count, type, offset, inst)); };
 GLI.glDrawElementsInstancedBaseVertexBaseInstance = (mode, count, type, offset, inst, base) => GLI.glDrawElementsInstancedBaseVertex(mode, count, type, offset, inst, base);
 GLI.glDrawRangeElements = (mode, start, end, count, type, offset) => { prepareDraw(); gl.drawRangeElements(mode, start, end, count, type, offset); };
-GLI.glDrawRangeElementsBaseVertex = (mode, start, end, count, type, offset, base) => { prepareDraw(); withBaseVertex(base, () => gl.drawElements(mode, count, type, offset)); };
+GLI.glDrawRangeElementsBaseVertex = (mode, start, end, count, type, offset, base) => { syncTextureBuffers(); withBaseVertex(base, () => gl.drawElements(mode, count, type, offset)); };
 GLI.glMultiDrawArrays = (mode, firsts, counts, n) => { prepareDraw(); for (let i = 0; i < n; i++) gl.drawArrays(mode, rI(firsts, i), rI(counts, i)); };
 GLI.glMultiDrawElements = (mode, counts, type, offsets, n) => {
   prepareDraw();
   for (let i = 0; i < n; i++) gl.drawElements(mode, rI(counts, i), type, isArr(offsets) ? Number(offsets[i]) : P.ptr(offsets + i * 8));
 };
 GLI.glMultiDrawElementsBaseVertex = (mode, counts, type, offsets, n, bases) => {
-  prepareDraw();
+  syncTextureBuffers();
   for (let i = 0; i < n; i++) {
     const off = isArr(offsets) ? Number(offsets[i]) : P.ptr(offsets + i * 8);
     const c = rI(counts, i);

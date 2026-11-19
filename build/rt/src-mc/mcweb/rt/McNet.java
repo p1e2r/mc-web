@@ -44,20 +44,15 @@ public final class McNet {
             protected void initChannel(Channel c) {
                 // bytes leaving the pipeline go to the WebSocket
                 c.pipeline().addFirst("mcweb-ws", new ChannelOutboundHandlerAdapter() {
+                    // packets written between two flushes go out as ONE WebSocket message (one frame through the
+                    // tunnel, one TCP write at the relay) instead of one message per packet
+                    private final io.netty.buffer.CompositeByteBuf pending = Unpooled.compositeBuffer(1024);
+
                     @Override
                     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
                         if (msg instanceof ByteBuf) {
                             ByteBuf b = (ByteBuf) msg;
-                            try {
-                                int n = b.readableBytes();
-                                if (n > 0) {
-                                    byte[] out = new byte[n];
-                                    b.readBytes(out);
-                                    send(id, out, n);
-                                }
-                            } finally {
-                                b.release();
-                            }
+                            if (b.isReadable()) pending.addComponent(true, b); else b.release();
                             promise.setSuccess();
                         } else {
                             ctx.write(msg, promise);
@@ -65,7 +60,21 @@ public final class McNet {
                     }
 
                     @Override
+                    public void flush(ChannelHandlerContext ctx) {
+                        int n = pending.readableBytes();
+                        if (n > 0) {
+                            byte[] out = new byte[n];
+                            pending.readBytes(out);
+                            send(id, out, n);
+                        }
+                        pending.discardReadComponents();   // releases the packets that were just sent
+                        ctx.flush();
+                    }
+
+                    @Override
                     public void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+                        flush(ctx);
+                        pending.release();
                         McNet.close(id);
                         super.close(ctx, promise);
                     }

@@ -122,16 +122,21 @@ function bridge(ws, user, target) {
   let idle = setTimeout(() => ws.close(4000, "idle"), IDLE_MS);
   const touch = () => { clearTimeout(idle); idle = setTimeout(() => ws.close(4000, "idle"), IDLE_MS); };
   const pending = [];
-  let connected = false;
+  let connected = false, paused = false, closed = false;
   tcp.on("connect", () => { connected = true; for (const b of pending) tcp.write(b); pending.length = 0; });
   ws.on("message", (data) => { touch(); if (connected) tcp.write(data); else pending.push(data); });
   tcp.on("data", (b) => {
     touch();
     ws.send(b);
     // backpressure: pause the server side while the browser is slow to read
-    if (ws.bufferedAmount > 4 * 1024 * 1024) { tcp.pause(); const t = setInterval(() => { if (ws.bufferedAmount < 1024 * 1024) { clearInterval(t); tcp.resume(); } }, 20); }
+    if (!paused && ws.bufferedAmount > 4 * 1024 * 1024) {
+      paused = true;
+      tcp.pause();
+      const t = setInterval(() => {
+        if (closed || ws.bufferedAmount < 1024 * 1024) { clearInterval(t); paused = false; if (!closed) tcp.resume(); }
+      }, 20);
+    }
   });
-  let closed = false;
   const close = (why) => {
     if (closed) return;
     closed = true;

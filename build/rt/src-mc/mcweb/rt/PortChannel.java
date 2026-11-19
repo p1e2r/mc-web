@@ -80,19 +80,28 @@ public final class PortChannel extends AbstractChannel {
     @Override protected void doBeginRead() { }
 
     @Override protected void doWrite(ChannelOutboundBuffer in) {
+        // everything flushed together goes to the page as ONE message (fewer postMessage hops per tick)
+        int total = 0;
+        java.util.List<ByteBuf> bufs = new java.util.ArrayList<>();
         Object msg;
         while ((msg = in.current()) != null) {
-            if (msg instanceof ByteBuf) {
-                ByteBuf b = (ByteBuf) msg;
-                int n = b.readableBytes();
-                if (n > 0) {
-                    byte[] out = new byte[n];
-                    b.getBytes(b.readerIndex(), out);
-                    send(id, out, n);
-                }
+            if (msg instanceof ByteBuf && ((ByteBuf) msg).isReadable()) {
+                ByteBuf b = ((ByteBuf) msg).retain();
+                bufs.add(b);
+                total += b.readableBytes();
             }
             in.remove();
         }
+        if (total == 0) { for (ByteBuf b : bufs) b.release(); return; }
+        byte[] out = new byte[total];
+        int off = 0;
+        for (ByteBuf b : bufs) {
+            int n = b.readableBytes();
+            b.getBytes(b.readerIndex(), out, off, n);
+            off += n;
+            b.release();
+        }
+        send(id, out, total);
     }
 
     @Override public ChannelConfig config() { return config; }

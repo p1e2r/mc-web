@@ -7,8 +7,8 @@ import org.teavm.jso.JSBody;
 import org.teavm.jso.JSByRef;
 
 /** mc-web: gzip/zlib via fflate (TeaVM's jzlib-based streams fail on flush-after-finish) (MIT License). */
-final class JsZ {
-    static final int GZIP = 0, ZLIB = 1, RAW = 2;
+public final class JsZ {
+    public static final int GZIP = 0, ZLIB = 1, RAW = 2;
     private JsZ() { }
 
     static byte[] compress(int kind, byte[] data, int len) {
@@ -18,7 +18,7 @@ final class JsZ {
         return out;
     }
 
-    static byte[] decompress(int kind, byte[] data, int len) throws IOException {
+    public static byte[] decompress(int kind, byte[] data, int len) throws IOException {
         int n = ndecompress(kind, data, len);
         if (n < 0) throw new java.util.zip.ZipException(err());
         byte[] out = new byte[n];

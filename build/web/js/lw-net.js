@@ -21,7 +21,9 @@ function relayUrl(target) {
 // TeaVM thread synchronously from there throws "Another thread is running"
 function wake(c) {
   const w = c.waiter;
-  if (w) { c.waiter = null; setTimeout(w, 0); }
+  // mcwebSetTimeout (MessageChannel) is not clamped to >= 4 ms like nested setTimeout(0): every packet burst used to
+  // wait up to 4 ms extra before the network thread saw it
+  if (w) { c.waiter = null; (globalThis.mcwebSetTimeout || setTimeout)(w, 0); }
 }
 
 // a connection over a MessagePort (singleplayer world running in a Web Worker); same API as WebSocket ones
