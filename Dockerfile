@@ -7,8 +7,12 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends nginx python3 nodejs npm unzip ca-certificates curl \
  && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled/default
 
+# downloaded in its own layer so code changes don't re-fetch it (and retried: Maven Central can hiccup)
 ARG JVMDG_VERSION=2.0.1
 WORKDIR /opt/mcweb
+RUN curl -fsSL --retry 6 --retry-delay 5 --retry-all-errors -o jvmdg.jar \
+      "https://repo1.maven.org/maven2/xyz/wagyourtail/jvmdowngrader/jvmdowngrader/${JVMDG_VERSION}/jvmdowngrader-${JVMDG_VERSION}-all.jar" \
+ && unzip -tq jvmdg.jar
 COPY tvm/ tvm/
 COPY build/ build/
 COPY relay/ relay/
@@ -16,12 +20,11 @@ COPY docker/ docker/
 
 # tools that don't depend on Minecraft are prepared at image build time
 RUN set -e; L=tvm/lib; \
-    curl -fsSL -o jvmdg.jar "https://repo1.maven.org/maven2/xyz/wagyourtail/jvmdowngrader/jvmdowngrader/${JVMDG_VERSION}/jvmdowngrader-${JVMDG_VERSION}-all.jar"; \
     javac -nowarn -cp "$(ls $L/*.jar | tr '\n' ':')" -d tvm/drv tvm/drv/Spike.java; \
     mkdir -p build/patcher/out; \
     javac -nowarn -cp "$L/asm-9.10.1.jar:$L/asm-tree-9.10.1.jar:$L/asm-analysis-9.10.1.jar:$L/asm-commons-9.10.1.jar:$L/asm-util-9.10.1.jar" \
       -d build/patcher/out build/patcher/src/Patch.java; \
-    cd relay && npm install --omit=dev --no-audit --no-fund && cd ..; \
+    cd relay && npm install --omit=dev --no-audit --no-fund --fetch-retries=5 && cd ..; \
     mkdir -p building /srv && cp docker/building.html building/index.html && cp docker/nginx.conf /etc/nginx/nginx.conf; \
     chmod +x docker/*.sh docker/*.py build/*.sh; \
     (cd /opt/mcweb && find build tvm docker/build-game.sh docker/fetch-mojang.py -type f \
