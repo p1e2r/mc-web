@@ -1,0 +1,260 @@
+# mc-web TeaVM patch rules (MIT License)
+call java/lang/Thread.onSpinWait -> mcweb/rt/Shim.threadOnSpinWait
+call java/lang/Thread.isVirtual -> mcweb/rt/Shim.threadIsVirtual
+call java/lang/Thread.setContextClassLoader -> mcweb/rt/Shim.threadSetContextClassLoader
+call java/lang/Thread.threadId -> mcweb/rt/Shim.threadThreadId
+call java/lang/Thread.dumpStack -> mcweb/rt/Shim.threadDumpStack
+call java/lang/System.exit -> mcweb/rt/Shim.systemExit
+call java/lang/System.mapLibraryName -> mcweb/rt/Shim.systemMapLibraryName
+call java/lang/System.loadLibrary -> mcweb/rt/Shim.systemLoadLibrary
+call java/lang/System.load -> mcweb/rt/Shim.systemLoad
+call java/lang/System.getenv()Ljava/util/Map; -> mcweb/rt/Shim.systemGetenv
+call java/lang/Runtime.addShutdownHook -> mcweb/rt/Shim.runtimeAddShutdownHook
+call java/lang/Runtime.removeShutdownHook -> mcweb/rt/Shim.runtimeRemoveShutdownHook
+call java/lang/Runtime.maxMemory -> mcweb/rt/Shim.runtimeMaxMemory
+call java/lang/Character.toString(I)Ljava/lang/String; -> mcweb/rt/Shim.characterToString
+call java/lang/Character.codePointOf -> mcweb/rt/Shim.characterCodePointOf
+call java/lang/StringBuilder.append(B)Ljava/lang/StringBuilder; -> mcweb/rt/Shim.stringBuilderAppendByte
+call java/lang/Math.fma(FFF)F -> mcweb/rt/Shim.mathFma
+call java/lang/Integer.parseUnsignedInt(Ljava/lang/String;I)I -> mcweb/rt/Shim.integerParseUnsignedInt
+call java/lang/Long.parseUnsignedLong(Ljava/lang/String;I)J -> mcweb/rt/Shim.longParseUnsignedLong
+call java/util/regex/Pattern.asPredicate -> mcweb/rt/Shim.patternAsPredicate
+call java/util/regex/Matcher.appendReplacement(Ljava/lang/StringBuilder;Ljava/lang/String;)Ljava/util/regex/Matcher; -> mcweb/rt/Shim.matcherAppendReplacement
+call java/util/regex/Matcher.appendTail(Ljava/lang/StringBuilder;)Ljava/lang/StringBuilder; -> mcweb/rt/Shim.matcherAppendTail
+call java/util/Collections.unmodifiableSortedSet -> mcweb/rt/Shim.collectionsUnmodifiableSortedSet
+call java/util/Collections.unmodifiableSortedMap -> mcweb/rt/Shim.collectionsUnmodifiableSortedMap
+call java/util/stream/Stream.ofNullable -> mcweb/rt/Shim.streamOfNullable
+call java/util/stream/StreamSupport.intStream -> mcweb/rt/Shim.streamSupportIntStream
+call java/util/stream/StreamSupport.longStream -> mcweb/rt/Shim.streamSupportLongStream
+call java/lang/ref/Reference.reachabilityFence -> mcweb/rt/Shim.referenceReachabilityFence
+call java/lang/Class.isRecord -> mcweb/rt/Shim.classIsRecord
+call java/lang/Class.isHidden -> mcweb/rt/Shim.classIsHidden
+call java/lang/Class.isAnonymousClass -> mcweb/rt/Shim.classIsAnonymousClass
+call java/lang/Class.getPackageName -> mcweb/rt/Shim.classGetPackageName
+call java/lang/Class.getGenericSuperclass -> mcweb/rt/Shim.classGetGenericSuperclass
+call java/lang/Class.getGenericInterfaces -> mcweb/rt/Shim.classGetGenericInterfaces
+call java/lang/Class.getResource -> mcweb/rt/Shim.classGetResource
+call java/lang/ClassLoader.getResource -> mcweb/rt/Shim.classLoaderGetResource
+call java/lang/ClassLoader.getResources -> mcweb/rt/Shim.classLoaderGetResources
+call java/lang/ClassLoader.loadClass(Ljava/lang/String;)Ljava/lang/Class; -> mcweb/rt/Shim.classLoaderLoadClass
+call java/util/Date.toInstant -> mcweb/rt/Shim.dateToInstant
+call java/util/Date.from -> mcweb/rt/Shim.dateFrom
+# Thread constructors TeaVM lacks: drop ThreadGroup / stack size / inherit flag
+ctor java/lang/Thread(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;Ljava/lang/String;J)V -> keep 1,2
+ctor java/lang/Thread(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;Ljava/lang/String;JZ)V -> keep 1,2
+ctor java/lang/Thread(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;Ljava/lang/String;)V -> keep 1,2
+ctor java/lang/Thread(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;)V -> keep 1
+ctor java/lang/Thread(Ljava/lang/ThreadGroup;Ljava/lang/String;)V -> keep 1
+class java/lang/Module -> mcweb/rt/FakeModule
+class java/lang/ModuleLayer -> mcweb/rt/FakeModuleLayer
+call java/lang/Class.getModule -> mcweb/rt/Shim.classGetModule
+call java/lang/Class.getSigners -> mcweb/rt/Shim.classGetSigners
+call java/lang/ClassLoader.getSystemResource -> mcweb/rt/Shim.classLoaderGetSystemResource
+call java/util/concurrent/ThreadLocalRandom.nextSecondarySeed -> mcweb/rt/Shim.tlrNextSecondarySeed
+call java/io/File.toPath -> mcweb/rt/Shim.fileToPath
+call java/nio/file/Files.probeContentType -> mcweb/rt/Shim.filesProbeContentType
+call java/nio/charset/Charset.isSupported -> mcweb/rt/Shim.charsetIsSupported
+call net/minecraft/util/profiling/jfr/JfrProfiler.getInstance -> mcweb/rt/McShim.noJfr
+call jdk/jfr/FlightRecorder.isAvailable -> mcweb/rt/Shim.alwaysFalse
+class java/util/UUID -> mcweb/rt/UUID
+call java/lang/invoke/MethodHandles.privateLookupIn -> mcweb/rt/Shim.privateLookupIn
+ctor java/lang/String([BIII)V -> keep 0,2,3
+body net/minecraft/util/NativeModuleLister.listModules -> mcweb/rt/Shim.emptyList
+body net/minecraft/util/NativeModuleLister.tryGetModuleVersion -> mcweb/rt/Shim.emptyOptionalS
+body com/mojang/blaze3d/platform/NativeLibrariesBootstrap.loadLibraries -> default
+body com/mojang/blaze3d/platform/NativeLibrariesBootstrap.isVulkanLoaderAvailable -> default
+body net/minecraft/SystemReport.putSpaceForPath -> default
+body org/lwjgl/VersionImpl.find -> mcweb/rt/Shim.lwjglVersion
+body com/google/gson/internal/UnsafeAllocator.create -> mcweb/rt/McShim.gsonAllocator
+# ---- round 4: networking cut-offs (singleplayer uses Netty's local transport only)
+class java/lang/invoke/VarHandle -> mcweb/rt/FakeVarHandle
+call io/netty/channel/epoll/Epoll.isAvailable -> mcweb/rt/Shim.alwaysFalse
+call io/netty/channel/kqueue/KQueue.isAvailable -> mcweb/rt/Shim.alwaysFalse
+body net/minecraft/server/network/EventLoopGroupHolder$1.ioHandlerFactory -> default
+body net/minecraft/server/network/EventLoopGroupHolder$2.ioHandlerFactory -> default
+body net/minecraft/server/network/EventLoopGroupHolder$3.ioHandlerFactory -> default
+class io/netty/channel/socket/nio/NioSocketChannel -> io/netty/channel/local/LocalChannel
+class io/netty/channel/socket/nio/NioServerSocketChannel -> io/netty/channel/local/LocalServerChannel
+class io/netty/channel/epoll/EpollSocketChannel -> io/netty/channel/local/LocalChannel
+class io/netty/channel/epoll/EpollServerSocketChannel -> io/netty/channel/local/LocalServerChannel
+class io/netty/channel/kqueue/KQueueSocketChannel -> io/netty/channel/local/LocalChannel
+class io/netty/channel/kqueue/KQueueServerSocketChannel -> io/netty/channel/local/LocalServerChannel
+body io/netty/util/internal/logging/InternalLoggerFactory.newDefaultFactory -> mcweb/rt/McShim.nettyLoggerFactory
+body com/mojang/text2speech/Narrator.getNarrator -> mcweb/rt/McShim.dummyNarrator
+# ---- memory bridge: sun.misc.Unsafe -> FakeUnsafe; LWJGL buffer plumbing -> Mem
+class sun/misc/Unsafe -> mcweb/rt/FakeUnsafe
+call java/nio/ByteBuffer.allocateDirect -> mcweb/rt/Mem.allocateDirect
+body org/lwjgl/system/MemoryUtil.getUnsafeInstance -> mcweb/rt/Mem.unsafe
+body org/lwjgl/system/MemoryUtil.getAddressOffset -> mcweb/rt/Mem.offsetAddress
+body org/lwjgl/system/MemoryUtil.getMarkOffset -> mcweb/rt/Mem.offsetMark
+body org/lwjgl/system/MemoryUtil.getPositionOffset -> mcweb/rt/Mem.offsetPosition
+body org/lwjgl/system/MemoryUtil.getLimitOffset -> mcweb/rt/Mem.offsetLimit
+body org/lwjgl/system/MemoryUtil.getCapacityOffset -> mcweb/rt/Mem.offsetCapacity
+body org/lwjgl/system/MemoryUtil.getFieldOffset -> default
+body org/lwjgl/system/MemoryUtil.getFieldOffsetInt -> default
+body org/lwjgl/system/MemoryUtil.getFieldOffsetObject -> default
+body org/lwjgl/system/MemoryUtil.memAddress0 -> mcweb/rt/Mem.memAddress0
+body org/lwjgl/system/MemoryUtil.wrapBufferByte -> mcweb/rt/Mem.wrapBufferByte
+body org/lwjgl/system/MemoryUtil.wrapBufferShort -> mcweb/rt/Mem.wrapBufferShort
+body org/lwjgl/system/MemoryUtil.wrapBufferChar -> mcweb/rt/Mem.wrapBufferChar
+body org/lwjgl/system/MemoryUtil.wrapBufferInt -> mcweb/rt/Mem.wrapBufferInt
+body org/lwjgl/system/MemoryUtil.wrapBufferLong -> mcweb/rt/Mem.wrapBufferLong
+body org/lwjgl/system/MemoryUtil.wrapBufferFloat -> mcweb/rt/Mem.wrapBufferFloat
+body org/lwjgl/system/MemoryUtil.wrapBufferDouble -> mcweb/rt/Mem.wrapBufferDouble
+body org/lwjgl/system/MemoryUtil.slice -> mcweb/rt/Mem.slice
+body org/lwjgl/system/MemoryUtil.realloc -> mcweb/rt/Mem.realloc
+body org/lwjgl/system/MemoryUtil.memSlice(Ljava/nio/ByteBuffer;)Ljava/nio/ByteBuffer; -> mcweb/rt/Mem.memSlice
+body org/lwjgl/system/MemoryUtil.memSlice(Ljava/nio/ByteBuffer;II)Ljava/nio/ByteBuffer; -> mcweb/rt/Mem.memSlice
+body org/lwjgl/system/MemoryUtil.memDuplicate(Ljava/nio/ByteBuffer;)Ljava/nio/ByteBuffer; -> mcweb/rt/Mem.memDuplicate
+body org/lwjgl/system/MemoryUtil.nmemAlloc -> mcweb/rt/Mem.nmemAlloc
+body org/lwjgl/system/MemoryUtil.nmemCalloc -> mcweb/rt/Mem.nmemCalloc
+body org/lwjgl/system/MemoryUtil.nmemRealloc -> mcweb/rt/Mem.nmemRealloc
+body org/lwjgl/system/MemoryUtil.nmemFree -> mcweb/rt/Mem.nmemFree
+body org/lwjgl/system/MemoryUtil.nmemAlignedAlloc -> mcweb/rt/Mem.nmemAlignedAlloc
+body org/lwjgl/system/MemoryUtil.nmemAlignedFree -> mcweb/rt/Mem.nmemAlignedFree
+# ---- round 5
+call java/io/Reader.transferTo -> mcweb/rt/Shim.readerTransferTo
+call java/io/BufferedReader.transferTo -> mcweb/rt/Shim.bufferedReaderTransferTo
+call java/lang/Math.fma(DDD)D -> mcweb/rt/Shim.mathFmaD
+call java/lang/Runtime.exec([Ljava/lang/String;)Ljava/lang/Process; -> mcweb/rt/Shim.runtimeExec
+call java/lang/Runtime.exec(Ljava/lang/String;)Ljava/lang/Process; -> mcweb/rt/Shim.runtimeExec1
+call java/lang/String.lines -> mcweb/rt/Shim.stringLines
+call java/lang/StringBuilder.append(S)Ljava/lang/StringBuilder; -> mcweb/rt/Shim.stringBuilderAppendShort
+call java/lang/Thread.getState -> mcweb/rt/Shim.threadGetState
+call java/lang/Thread.sleep(JI)V -> mcweb/rt/Shim.threadSleep2
+call java/lang/reflect/Array.newInstance(Ljava/lang/Class;[I)Ljava/lang/Object; -> mcweb/rt/Shim.arrayNewInstanceMulti
+call java/net/HttpURLConnection.getContentLengthLong -> mcweb/rt/Shim.httpContentLengthLong
+call java/net/URL.openConnection(Ljava/net/Proxy;)Ljava/net/URLConnection; -> mcweb/rt/Shim.urlOpenConnectionProxy
+call java/nio/ByteBuffer.slice(II)Ljava/nio/ByteBuffer; -> mcweb/rt/Shim.byteBufferSlice
+call java/nio/file/Files.createLink -> mcweb/rt/Shim.filesCreateLink
+call java/nio/file/Files.getFileStore -> mcweb/rt/Shim.filesGetFileStore
+call java/nio/file/Files.getPosixFilePermissions -> mcweb/rt/Shim.filesGetPosixFilePermissions
+call java/nio/file/Files.setPosixFilePermissions -> mcweb/rt/Shim.filesSetPosixFilePermissions
+call java/nio/file/Files.setLastModifiedTime -> mcweb/rt/Shim.filesSetLastModifiedTime
+call java/time/Duration.toSeconds -> mcweb/rt/Shim.durationToSeconds
+call java/util/Base64.getMimeDecoder -> mcweb/rt/Shim.base64MimeDecoder
+call java/util/Base64.getMimeEncoder -> mcweb/rt/Shim.base64MimeEncoder
+call java/util/Locale.getISO3Country -> mcweb/rt/Shim.localeGetISO3Country
+call java/util/Spliterators.emptySpliterator()Ljava/util/Spliterator; -> mcweb/rt/Shim.spliteratorsEmpty
+call java/util/Spliterators.iterator(Ljava/util/Spliterator;)Ljava/util/Iterator; -> mcweb/rt/Shim.spliteratorsIterator
+call java/util/Spliterators.iterator(Ljava/util/Spliterator$OfInt;)Ljava/util/PrimitiveIterator$OfInt; -> mcweb/rt/Shim.spliteratorsIteratorInt
+call java/util/Spliterators.spliterator([DIII)Ljava/util/Spliterator$OfDouble; -> mcweb/rt/Shim.spliteratorsDoubleArray
+class java/util/concurrent/ConcurrentHashMap$KeySetView -> mcweb/rt/KeySetView
+call java/util/concurrent/ConcurrentHashMap.newKeySet -> mcweb/rt/Shim.chmNewKeySet
+call java/util/concurrent/TimeUnit.convert(Ljava/time/Duration;)J -> mcweb/rt/Shim.timeUnitConvertDuration
+call java/util/zip/Inflater.inflate(Ljava/nio/ByteBuffer;)I -> mcweb/rt/Shim.inflaterInflateBB
+call java/util/zip/Inflater.setInput(Ljava/nio/ByteBuffer;)V -> mcweb/rt/Shim.inflaterSetInputBB
+call java/lang/invoke/MethodType.methodType -> mcweb/rt/Shim.methodType
+call java/lang/invoke/MethodHandles.publicLookup -> mcweb/rt/Shim.publicLookup
+call java/lang/invoke/MethodHandles$Lookup.unreflect -> mcweb/rt/Shim.lookupUnreflect
+call java/lang/invoke/MethodHandles$Lookup.unreflectConstructor -> mcweb/rt/Shim.lookupUnreflectConstructor
+call java/lang/invoke/MethodHandle.bindTo -> mcweb/rt/Shim.methodHandleBindTo
+call java/nio/file/FileSystem.newWatchService -> mcweb/rt/Shim.fsNewWatchService
+body com/mojang/blaze3d/platform/MacosUtil.exitNativeFullscreen -> default
+body com/mojang/blaze3d/platform/MacosUtil.clearResizableBit -> default
+body com/mojang/blaze3d/platform/MacosUtil.loadIcon -> default
+body com/mojang/blaze3d/platform/MacosUtil.setWindowColorSpaceForOpenGLBecauseGLFWDoesnt -> default
+drop com/mojang/text2speech/NarratorMac
+drop com/mojang/text2speech/NarratorWindows
+drop com/mojang/text2speech/NarratorLinux
+# ---- round 6
+call java/lang/invoke/MethodHandle.asType -> mcweb/rt/Shim.methodHandleAsType
+call java/lang/invoke/MethodHandles$Lookup.findStatic -> mcweb/rt/Shim.lookupFindStatic
+call java/lang/invoke/MethodHandles$Lookup.findVirtual -> mcweb/rt/Shim.lookupFindVirtual
+call java/nio/file/Files.readString(Ljava/nio/file/Path;)Ljava/lang/String; -> mcweb/rt/Shim.filesReadString
+call java/nio/file/Files.readString(Ljava/nio/file/Path;Ljava/nio/charset/Charset;)Ljava/lang/String; -> mcweb/rt/Shim.filesReadString2
+call java/nio/file/Files.getFileAttributeView -> mcweb/rt/Shim.filesGetFileAttributeView
+call java/nio/file/FileSystem.getPathMatcher -> mcweb/rt/Shim.fsGetPathMatcher
+body net/minecraft/server/chase/ChaseClient.handleMessage -> default
+body net/minecraft/client/gui/screens/packs/PackSelectionScreen$Watcher.watchDir -> default
+body net/minecraft/client/gui/screens/packs/PackSelectionScreen$Watcher.pollForChanges -> default
+# ---- natives -> JavaScript
+jsnatives org/lwjgl/
+body org/lwjgl/glfw/GLFW.glfwSwapBuffers -> mcweb/rt/Frame.swap
+body org/lwjgl/glfw/GLFW.glfwPollEvents -> org/lwjgl/web/WebEvents.pollEvents
+body org/lwjgl/glfw/GLFW.glfwWaitEvents -> org/lwjgl/web/WebEvents.pollEvents
+# ---- round 7: Realms world upload/download use java.net.http (not available)
+body com/mojang/realmsclient/client/worldupload/RealmsWorldUpload.lambda$packAndUpload$0 -> default
+body com/mojang/realmsclient/gui/screens/RealmsDownloadLatestWorldScreen.getContentLength -> default
+body com/mojang/realmsclient/gui/screens/RealmsDownloadLatestWorldScreen.lambda$downloadSave$0 -> default
+body org/apache/commons/compress/archivers/tar/TarArchiveEntry.readOsSpecificProperties -> default
+call java/io/FileInputStream.getChannel -> mcweb/rt/Shim.fisGetChannel
+call java/io/FileOutputStream.getChannel -> mcweb/rt/Shim.fosGetChannel
+stubnatives com/mojang/jtracy/
+body joptsimple/internal/Reflection.findConverter -> mcweb/rt/McShim.joptConverter
+# ---- Java 21-25 APIs used by the original 26.2 jars
+call java/util/Collections.unmodifiableSequencedSet -> mcweb/rt/Shim.collectionsUnmodifiableSequencedSet
+call java/nio/file/Path.resolve(Ljava/lang/String;[Ljava/lang/String;)Ljava/nio/file/Path; -> mcweb/rt/Shim.pathResolve2
+call java/lang/Thread.sleep(Ljava/time/Duration;)V -> mcweb/rt/Shim.threadSleepDuration
+call java/io/Reader.readAllAsString -> mcweb/rt/Shim.readerReadAllAsString
+body net/minecraft/server/packs/VanillaPackResourcesBuilder.lambda$static$1 -> mcweb/rt/McShim.vanillaRoots
+body org/joml/Options.decimalFormat -> mcweb/rt/Shim.jomlDecimalFormat
+call java/lang/Class.getResourceAsStream -> mcweb/rt/McShim.classGetResourceAsStream
+call java/lang/ClassLoader.getResourceAsStream -> mcweb/rt/McShim.classLoaderGetResourceAsStream
+call java/lang/ClassLoader.getSystemResourceAsStream -> mcweb/rt/McShim.classLoaderGetSystemResourceAsStream
+body net/minecraft/SystemReport.putHardware -> default
+body net/minecraft/SystemReport.putSoftware -> default
+body net/minecraft/util/datafix/DataFixers.optimize -> mcweb/rt/McShim.dfuOptimize
+body com/mojang/blaze3d/platform/DebugMemoryUntracker.lambda$static$0 -> default
+body com/mojang/blaze3d/platform/DebugMemoryUntracker.untrack -> default
+# ---- regex: \h / \H translation
+call java/util/regex/Pattern.compile(Ljava/lang/String;)Ljava/util/regex/Pattern; -> mcweb/rt/Shim.patternCompile
+call java/util/regex/Pattern.compile(Ljava/lang/String;I)Ljava/util/regex/Pattern; -> mcweb/rt/Shim.patternCompile2
+call java/util/regex/Pattern.matches(Ljava/lang/String;Ljava/lang/CharSequence;)Z -> mcweb/rt/Shim.patternMatches
+call java/lang/String.matches(Ljava/lang/String;)Z -> mcweb/rt/Shim.stringMatches
+call java/lang/String.replaceAll(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String; -> mcweb/rt/Shim.stringReplaceAll
+call java/lang/String.replaceFirst(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String; -> mcweb/rt/Shim.stringReplaceFirst
+call java/lang/String.split(Ljava/lang/String;)[Ljava/lang/String; -> mcweb/rt/Shim.stringSplit
+call java/lang/String.split(Ljava/lang/String;I)[Ljava/lang/String; -> mcweb/rt/Shim.stringSplit2
+call java/nio/file/Files.walk(Ljava/nio/file/Path;[Ljava/nio/file/FileVisitOption;)Ljava/util/stream/Stream; -> mcweb/rt/Shim.filesWalk
+call java/nio/file/Files.walk(Ljava/nio/file/Path;I[Ljava/nio/file/FileVisitOption;)Ljava/util/stream/Stream; -> mcweb/rt/Shim.filesWalk2
+call java/nio/file/Files.find -> mcweb/rt/Shim.filesFind
+call java/nio/file/Files.list -> mcweb/rt/Shim.filesList
+# compression via fflate (TeaVM's jzlib streams throw Z_BUF_ERROR on flush after finish)
+class java/util/zip/GZIPOutputStream -> mcweb/rt/zip/GzipOut
+class java/util/zip/GZIPInputStream -> mcweb/rt/zip/GzipIn
+body net/minecraft/world/level/chunk/storage/RegionFileVersion.lambda$static$2 -> mcweb/rt/zip/ZlibStreams.inflating
+body net/minecraft/world/level/chunk/storage/RegionFileVersion.lambda$static$3 -> mcweb/rt/zip/ZlibStreams.deflating
+# singleplayer: no RSA in TeaVM, and the in-memory connection never encrypts
+body net/minecraft/server/MinecraftServer.initializeKeyPair -> default
+# new 26.2 worlds have no pre-1.18 chunks to blend; skip the 1024-chunk region scans
+body net/minecraft/world/level/chunk/storage/IOWorker.isOldChunkAround -> default
+body io/netty/bootstrap/AbstractBootstrap.channel -> mcweb/rt/McShim.bootstrapChannel
+body io/netty/util/ResourceLeakDetector.addExclusions -> default
+body net/minecraft/client/particle/ParticleGroup.tickParticle -> mcweb/rt/McShim.tickParticle
+# TeaVM's ArrayDeque corrupts itself on Iterator.remove()
+class java/util/ArrayDeque -> mcweb/rt/ArrayDeque2
+call java/nio/file/Files.newByteChannel(Ljava/nio/file/Path;Ljava/util/Set;[Ljava/nio/file/attribute/FileAttribute;)Ljava/nio/channels/SeekableByteChannel; -> mcweb/rt/McShim.assetByteChannel
+# 32-bit float rounding where Minecraft compares floats exactly (model baking: "Can't find vertex to swap")
+fround net/minecraft/client/resources/model/
+fround net/minecraft/client/renderer/block/model/
+fround net/minecraft/client/renderer/FaceInfo
+fround com/mojang/math/
+fround org/joml/
+call java/nio/file/Files.newInputStream(Ljava/nio/file/Path;[Ljava/nio/file/OpenOption;)Ljava/io/InputStream; -> mcweb/rt/McShim.filesNewInputStream
+body net/minecraft/network/Connection.connect(Ljava/net/InetSocketAddress;Lnet/minecraft/server/network/EventLoopGroupHolder;Lnet/minecraft/network/Connection;)Lio/netty/channel/ChannelFuture; -> mcweb/rt/McNet.connect
+call java/lang/Thread.interrupt -> mcweb/rt/Shim.threadInterrupt
+# singleplayer world runs in a Web Worker (McWorker)
+body net/minecraft/client/Minecraft.doWorldLoad -> mcweb/rt/McWorker.doWorldLoad
+call net/minecraft/server/MinecraftServer.spin -> mcweb/rt/McWorker.spin
+body net/minecraft/server/network/ServerConnectionListener.startTcpServerListener -> default
+# dedicated server in the world worker: no management server, RCON, query, JMX, GUI, pid file, watchdog exits
+body net/minecraft/server/jsonrpc/ManagementServer.start -> default
+body net/minecraft/server/jsonrpc/security/JsonRpcSslContextProvider.createFrom -> default
+body net/minecraft/server/jsonrpc/security/JsonRpcSslContextProvider.loadKeystoreFromPath -> default
+call io/netty/channel/nio/NioIoHandler.newFactory -> io/netty/channel/local/LocalIoHandler.newFactory
+class net/minecraft/server/gui/MinecraftServerGui -> mcweb/rt/stub/ServerGuiStub
+call java/awt/GraphicsEnvironment.isHeadless -> mcweb/rt/Shim.alwaysTrue
+body net/minecraft/server/network/PlayerSafetyServiceTextFilter.createTextFilterFromConfig -> default
+body net/minecraft/server/rcon/thread/QueryThreadGs4.processPacket -> default
+body net/minecraft/server/rcon/thread/QueryThreadGs4.initSocket -> default
+body net/minecraft/server/rcon/thread/RconThread.create -> default
+class net/minecraft/util/monitoring/jmx/MinecraftServerStatistics -> mcweb/rt/stub/JmxStub
+body net/minecraft/server/dedicated/Settings.store -> default
+body net/minecraft/server/dedicated/ServerWatchdog.exit -> default
+body net/minecraft/server/dedicated/ServerWatchdog$1.run -> default
+body net/minecraft/server/Main.writePidFile -> default
+body joptsimple/internal/Columns.piecesOfEmbeddedLine -> default
+# all "threads" share the one JS thread, so GL calls are always on the render thread
+body com/mojang/blaze3d/systems/RenderSystem.isOnRenderThread -> mcweb/rt/Shim.alwaysTrue
+body com/mojang/blaze3d/systems/RenderSystem.assertOnRenderThread -> default

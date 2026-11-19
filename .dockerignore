@@ -1,0 +1,10 @@
+.git
+.github
+.env
+data
+**/node_modules
+build/work
+build/out
+build/rt/out
+build/rt/out-mod
+build/patcher/out

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mc-web — setting up</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #141518; color: #e8e8e8;
+         font: 15px/1.5 system-ui, sans-serif; }
+  .card { width: min(720px, 92vw); background: #0e0f11; border: 1px solid #3a3c40; border-radius: 6px; padding: 24px 28px; }
+  h1 { margin: 0 0 6px; font-size: 22px; }
+  p { margin: 0 0 14px; color: #a8abb0; }
+  pre { margin: 0; height: 260px; overflow: auto; background: #000; border-radius: 4px; padding: 10px 12px;
+        font: 12px/1.45 ui-monospace, monospace; color: #9fe29f; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Setting up Minecraft…</h1>
+  <p id="msg">This server is downloading Minecraft from Mojang and compiling it for the browser. This happens once and
+     takes about 5–20 minutes. This page reloads by itself when the game is ready.</p>
+  <pre id="log">waiting for the build to start…</pre>
+</div>
+<script>
+  const log = document.getElementById("log"), msg = document.getElementById("msg");
+  async function tick() {
+    try {
+      const t = await (await fetch("build.log", { cache: "no-store" })).text();
+      const stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+      log.textContent = t.split("\n").slice(-200).join("\n") || "waiting for the build to start…";
+      if (stick) log.scrollTop = log.scrollHeight;
+      if (/\[build\] .* done\s*$/m.test(t)) return setTimeout(() => location.reload(), 3000);
+      if (/BUILD FAILED/.test(t)) { msg.textContent = "The build failed. See the log below (or `docker logs mc-web`), fix the cause, then restart the container."; return; }
+    } catch (e) {}
+    setTimeout(tick, 3000);
+  }
+  tick();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+mc-web
+Copyright (c) 2026 Andrew Suryanto. MIT License (see LICENSE).
+
+This repository and the ghcr.io image contain NO files from Mojang Studios or Microsoft. Minecraft is
+downloaded from Mojang's servers (piston-meta.mojang.com, resources.download.minecraft.net,
+libraries.minecraft.net) by each user's own container, compiled there, and served only from that machine.
+Minecraft is a trademark of Mojang Synergies AB; mc-web is not affiliated with or endorsed by Mojang or Microsoft.
+Use of Minecraft is subject to the Minecraft EULA (https://www.minecraft.net/eula).
+
+Third-party software included:
+- TeaVM 0.16.0 (tvm/lib/teavm-*.jar), Apache License 2.0, https://teavm.org
+  teavm-classlib-0.16.0.jar is modified: TPath gained a default iterator() and TConcurrentMap a fix
+  (sources in build/classlib-fix/). Bundled TeaVM dependencies: hppc, Rhino, joda-time, jzlib (see their licenses).
+- ASM 9.10.1 (tvm/lib/asm-*.jar), BSD 3-Clause License, https://asm.ow2.io
+- fflate (build/web/js/fflate.min.js), MIT License, https://github.com/101arrowz/fflate
+- JvmDowngrader (downloaded into the image at build time), https://github.com/unimined/JvmDowngrader
+- jose and ws (relay, installed from npm), MIT License
+- nginx, Node.js, Python and Eclipse Temurin (OpenJDK) from the image's base and package manager

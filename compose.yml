@@ -1,0 +1,14 @@
+# mc-web: Minecraft 26.2 in the browser. `docker compose up -d`, then open http://<this machine>:8090
+# First start: downloads Minecraft from Mojang and compiles it (~5-20 min, ~8 GB RAM); the page shows progress.
+services:
+  mc-web:
+    image: ghcr.io/p1e2r/mc-web:latest
+    container_name: mc-web
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./data:/data
+    environment:
+      INSECURE_NO_AUTH: "1"   # built-in login check off; Cloudflare Access in front handles login
+      ALLOWED_TARGETS: "*"    # any public server

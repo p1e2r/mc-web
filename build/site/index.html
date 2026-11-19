@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<!-- mc-web TeaVM build test page (MIT License) -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Minecraft 26.2 (TeaVM)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #lwjgl-canvas { width: 100%; height: 100%; display: block; }
+  #log { position: fixed; left: 0; bottom: 0; width: 100%; max-height: 40%; overflow: auto; font: 11px monospace; color: #ddd;
+         background: rgba(0,0,0,.7); white-space: pre-wrap; display: none; }
+  #start { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+           background: radial-gradient(#2a2f36, #0d0f12); font: 16px system-ui, sans-serif; color: #eee; }
+  #start .card { background: rgba(0,0,0,.55); border: 2px solid #555; padding: 28px 32px; min-width: 300px; text-align: center; }
+  #start h1 { font-size: 22px; margin: 0 0 18px; letter-spacing: .5px; }
+  #start label { display: block; text-align: left; font-size: 13px; color: #aaa; margin-bottom: 6px; }
+  #start input { width: 100%; box-sizing: border-box; font-size: 18px; padding: 8px 10px; background: #000; color: #fff;
+                 border: 2px solid #a0a0a0; outline: none; }
+  #start input:focus { border-color: #fff; }
+  #start .err { color: #ff6b6b; font-size: 13px; min-height: 18px; margin: 6px 0 10px; text-align: left; }
+  #start button { width: 100%; font-size: 17px; padding: 10px; background: #5a5a5a; color: #fff; border: 2px solid #222;
+                  box-shadow: inset 0 2px #888, inset 0 -2px #333; cursor: pointer; }
+  #start button:hover { background: #6b7bbf; }
+  #start .status { font-size: 12px; color: #888; margin-top: 12px; }
+</style>
+</head>
+<body>
+<canvas id="lwjgl-canvas" tabindex="1"></canvas>
+<div id="log"></div>
+<div id="start"><form class="card" id="startForm">
+  <h1>Minecraft 26.2</h1>
+  <label for="name">Username</label>
+  <input id="name" maxlength="16" autocomplete="nickname" spellcheck="false">
+  <div class="err" id="nameErr"></div>
+  <button type="submit">Play</button>
+  <div class="status" id="loadStatus">Loading game files…</div>
+</form></div>
+<script>
+  Error.stackTraceLimit = 200;
+  window.LWJGLWeb = { config: { heapMB: 768, logMissing: true } };
+  const logEl = document.getElementById("log");
+  for (const k of ["log", "warn", "error"]) {
+    const orig = console[k].bind(console);
+    console[k] = (...a) => { orig(...a); logEl.textContent += a.map(String).join(" ") + "\n"; };
+  }
+  addEventListener("keydown", (e) => { if (e.key === "F12") logEl.style.display = logEl.style.display ? "" : "block"; });
+</script>
+<script src="js/fflate.min.js"></script>
+<script src="js/stackdecode.js"></script>
+<script src="js/lw-heap.js"></script>
+<script type="module">
+  import "./js/lw-core.js";
+  import "./js/lw-sys.js";
+  import "./js/lw-al.js";
+  import "./js/lw-glslfix.js";
+  import "./js/lw-glsl.js";
+  import "./js/lw-gl.js";
+  import "./js/lw-glfw.js";
+  import "./js/lw-idb.js";
+  import "./js/lw-net.js";
+  import "./js/lw-worker.js";
+  const LW = window.LWJGLWeb;
+  // Boot.fetch: the file is fetched here, then copied into a Java byte[] (LWJGLWeb.takeFile)
+  const pending = new Map();   // url -> [bytes...] (several fetches may be in flight)
+  LW.fetchFile = async (url) => {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(url + ": HTTP " + r.status);
+    const b = new Int8Array(await r.arrayBuffer());
+    if (!pending.has(url)) pending.set(url, []);
+    pending.get(url).push(b);
+    return b.length;
+  };
+  LW.takeFile = (url, dst) => { const q = pending.get(url); dst.set(q.shift()); if (!q.length) pending.delete(url); };
+  LW.endFrame = () => { if (LW.gl && LW.gl.endFrame) LW.gl.endFrame(); if (LW.fps) LW.fps.frame(); };
+  const rows = await (await fetch("natives.json")).json();
+  LW.N = LW.buildNatives(rows);
+  LW.sigs = await (await fetch("sigs.json")).json();
+  console.log("[mc-web] natives:", rows.length);
+  const t0 = performance.now();
+  // start loading the game code right away; the player picks a name meanwhile
+  const loaded = new Promise((ok, err) => { const s = document.createElement("script"); s.src = "classes.js"; s.onload = ok; s.onerror = err; document.head.appendChild(s); })
+    .then(() => { console.log("[mc-web] classes.js loaded in", Math.round(performance.now() - t0), "ms"); document.getElementById("loadStatus").textContent = "Game files loaded"; });
+
+  // ---- username (offline mode: 3-16 letters, digits or _; the UUID is derived from it like on offline servers)
+  const VALID = /^[A-Za-z0-9_]{3,16}$/;
+  const clean = (s) => { s = (s || "").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 16); return s.length >= 3 ? s : (s + "___").slice(0, 3); };
+  let saved = null;
+  try { saved = localStorage.getItem("mcweb.username"); } catch (e) {}
+  const nameEl = document.getElementById("name"), errEl = document.getElementById("nameErr");
+  nameEl.value = saved && VALID.test(saved) ? saved : "Player";
+  if (!saved && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    // behind Cloudflare Access: suggest the name part of the signed-in email
+    fetch("/cdn-cgi/access/get-identity").then((r) => r.ok ? r.json() : null)
+      .then((id) => { if (id && id.email && nameEl.value === "Player") nameEl.value = clean(id.email.split("@")[0]); }).catch(() => {});
+  }
+  nameEl.focus(); nameEl.select();
+  const username = await new Promise((resolve) => {
+    document.getElementById("startForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const v = nameEl.value.trim();
+      if (!VALID.test(v)) { errEl.textContent = "3–16 characters: letters, numbers and _ only"; nameEl.focus(); return; }
+      try { localStorage.setItem("mcweb.username", v); } catch (e2) {}
+      document.getElementById("loadStatus").textContent = "Starting…";
+      resolve(v);
+    });
+  });
+  await loaded;
+  document.getElementById("start").remove();
+  document.getElementById("lwjgl-canvas").focus();
+  const args = ["--version", "26.2", "--gameDir", "/mc", "--assetsDir", "/mc/assets", "--assetIndex", "32",
+                "--accessToken", "0", "--username", username,
+                "--userType", "legacy", "--offlineDeveloperMode", "--graphicsBackend", "opengl"];
+  try { main(args); } catch (e) { console.error("[mc-web] main threw", String(e), e && e.stack); }
+  addEventListener("error", (ev) => console.error("[mc-web] uncaught", String(ev.error), ev.error && ev.error.stack));
+</script>
+</body>
+</html>

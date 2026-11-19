@@ -1,0 +1,12 @@
+{
+  "name": "mcweb-relay",
+  "version": "1.0.0",
+  "description": "WebSocket-to-TCP relay for mc-web multiplayer, gated by Cloudflare Access",
+  "license": "MIT",
+  "type": "module",
+  "main": "relay.js",
+  "dependencies": {
+    "jose": "^5.9.6",
+    "ws": "^8.18.0"
+  }
+}
